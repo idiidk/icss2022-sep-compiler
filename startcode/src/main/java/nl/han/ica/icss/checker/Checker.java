@@ -23,10 +23,14 @@ public class Checker {
             checkDeclaration((Declaration) node);
         } else if (node instanceof VariableAssignment) {
             checkVariableAssignment((VariableAssignment) node);
-        } else if(node instanceof  VariableReference) {
+        } else if (node instanceof VariableReference) {
             checkVariableReference((VariableReference) node);
+        } else if (node instanceof IfClause) {
+            checkIfClause((IfClause) node);
+        } else if (node instanceof ElseClause) {
+            checkElseClause((ElseClause) node);
         } else {
-            System.out.println("Not implemented: " + node.getNodeLabel());
+            System.out.println("Check not implemented for node of type: " + node.getNodeLabel());
         }
     }
 
@@ -48,9 +52,32 @@ public class Checker {
         variableTypes.popScope();
     }
 
+    public void checkIfClause(IfClause node) {
+        // Make sure to check the else clause aswell
+        if(node.elseClause != null) {
+            checkNode(node.elseClause);
+        }
+
+        // Check the conditional expression of the if statement
+        checkNode(node.conditionalExpression);
+
+        variableTypes.pushScope();
+        for (ASTNode child : node.body) {
+            checkNode(child);
+        }
+        variableTypes.popScope();
+    }
+
+    public void checkElseClause(ElseClause node) {
+        variableTypes.pushScope();
+        for (ASTNode child : node.body) {
+            checkNode(child);
+        }
+        variableTypes.popScope();
+    }
+
     private void checkDeclaration(Declaration node) {
         ExpressionType expressionType = getExpressionType(node.expression);
-        System.out.println(expressionType.name());
 
         // Check if expression type matches for the property being declared:
         switch (node.property.name) {
@@ -97,6 +124,7 @@ public class Checker {
 
     // TODO: handle if / else clauses
 
+
     // TODO: make the checkOperation handler
 
     public ExpressionType getExpressionType(Expression expression) {
@@ -105,7 +133,7 @@ public class Checker {
         // the right type, or we'll error in the checkOperation checker.
 
         // FOOL PROOF I SAY :D
-        if(expression instanceof Operation) {
+        if (expression instanceof Operation) {
             return getExpressionType(((Operation) expression).lhs);
         }
 
@@ -114,7 +142,7 @@ public class Checker {
         // This error is used to determine if the variable is set, and we'll return accordingly
         if (expression instanceof VariableReference) {
             checkVariableReference((VariableReference) expression);
-            if(expression.hasError()) {
+            if (expression.hasError()) {
                 return ExpressionType.UNDEFINED;
             } else {
                 return variableTypes.getVariable(((VariableReference) expression).name);
