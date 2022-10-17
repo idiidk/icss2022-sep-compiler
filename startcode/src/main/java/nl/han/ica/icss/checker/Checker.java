@@ -3,7 +3,13 @@ package nl.han.ica.icss.checker;
 import nl.han.ica.datastructures.SymbolTable;
 import nl.han.ica.icss.ast.*;
 import nl.han.ica.icss.ast.literals.*;
+import nl.han.ica.icss.ast.operations.AddOperation;
+import nl.han.ica.icss.ast.operations.MultiplyOperation;
+import nl.han.ica.icss.ast.operations.SubtractOperation;
 import nl.han.ica.icss.ast.types.ExpressionType;
+
+import java.util.Arrays;
+import java.util.List;
 
 public class Checker {
     private SymbolTable<String, ExpressionType> variableTypes;
@@ -19,6 +25,8 @@ public class Checker {
             checkStylesheet((Stylesheet) node);
         } else if (node instanceof Stylerule) {
             checkStylerule((Stylerule) node);
+        } else if (node instanceof Operation) {
+            checkOperation((Operation) node);
         } else if (node instanceof Declaration) {
             checkDeclaration((Declaration) node);
         } else if (node instanceof VariableAssignment) {
@@ -30,6 +38,7 @@ public class Checker {
         } else if (node instanceof ElseClause) {
             checkElseClause((ElseClause) node);
         } else {
+            if (node instanceof Literal) return; // Just skip literals
             System.out.println("Check not implemented for node of type: " + node.getNodeLabel());
         }
     }
@@ -52,9 +61,38 @@ public class Checker {
         variableTypes.popScope();
     }
 
+    private void checkOperation(Operation node) {
+        checkNode(node.lhs);
+        checkNode(node.rhs);
+
+        ExpressionType leftType = getExpressionType(node.lhs);
+        ExpressionType rightType = getExpressionType(node.rhs);
+
+        // Check if expression is of not allowed type
+        List<ExpressionType> notAllowed = Arrays.asList(ExpressionType.BOOL, ExpressionType.COLOR);
+
+        // If the index is found the expression type is not allowed
+        if (notAllowed.contains(leftType) || notAllowed.contains(rightType)) {
+            node.setError("Expressions cannot contain types " + notAllowed);
+        }
+
+        if (node instanceof MultiplyOperation) {
+            if (leftType != ExpressionType.SCALAR || rightType != ExpressionType.SCALAR) {
+                node.setError("Multiply is only allowed with one scalar literal");
+                return;
+            }
+        }
+
+        if (node instanceof AddOperation || node instanceof SubtractOperation) {
+            if (leftType != rightType) {
+                node.setError("You can only add or subtract with the same literal.");
+            }
+        }
+    }
+
     public void checkIfClause(IfClause node) {
         // Make sure to check the else clause aswell
-        if(node.elseClause != null) {
+        if (node.elseClause != null) {
             checkNode(node.elseClause);
         }
 
@@ -77,6 +115,7 @@ public class Checker {
     }
 
     private void checkDeclaration(Declaration node) {
+        checkNode(node.expression);
         ExpressionType expressionType = getExpressionType(node.expression);
 
         // Check if expression type matches for the property being declared:
@@ -102,6 +141,7 @@ public class Checker {
     }
 
     private void checkVariableAssignment(VariableAssignment node) {
+        checkNode(node.expression);
         String newVariableName = node.name.name; // // Variable reference name (very nice naming scheme I know)
 
         ExpressionType newExpressionType = getExpressionType(node.expression);
