@@ -122,11 +122,6 @@ public class Checker {
         }
     }
 
-    // TODO: handle if / else clauses
-
-
-    // TODO: make the checkOperation handler
-
     public ExpressionType getExpressionType(Expression expression) {
         // If the expression contains an operation, unpack that bitch
         // and return the eventual left type. Left type should be the same as
