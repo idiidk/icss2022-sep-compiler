@@ -14,34 +14,43 @@ import java.util.ArrayList;
 
 public class Evaluator implements Transform {
     private SymbolTable<String, Literal> variableValues;
+    private ArrayList<ASTNode> toAdd;
+    ArrayList<ASTNode> newTree;
 
     @Override
     public void apply(AST ast) {
+        toAdd = new ArrayList<>();
+        newTree = new ArrayList<>();
         variableValues = new SymbolTable<>();
 
         variableValues.pushScope();
         recursiveChildTransform(ast.root);
         variableValues.popScope();
+
+        ast.root.body = newTree;
     }
 
     public void recursiveChildTransform(ASTNode parentNode) {
         for (ASTNode child : parentNode.getChildren()) {
+            toAdd.add(child);
+
             if (child instanceof Stylerule) {
+                toAdd = new ArrayList<>();
+
                 variableValues.pushScope();
                 recursiveChildTransform(child);
                 variableValues.popScope();
-            }
 
-            if (child instanceof VariableAssignment) {
+                Stylerule newStylerule = new Stylerule();
+                newStylerule.body = toAdd;
+                newTree.add(newStylerule);
+            } else if (child instanceof VariableAssignment) {
                 transformVariableAssignment((VariableAssignment) child);
-            }
-
-            if (child instanceof Declaration) {
+            } else if (child instanceof Declaration) {
                 transformDeclaration((Declaration) child);
-            }
-
-            if (child instanceof IfClause) {
+            } else if (child instanceof IfClause) {
                 transformIfClause((IfClause) child);
+                toAdd.remove(child);
             }
         }
     }
