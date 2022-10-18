@@ -18,148 +18,109 @@ public class Evaluator implements Transform {
     @Override
     public void apply(AST ast) {
         variableValues = new SymbolTable<>();
-        transformNode(ast.root);
-    }
 
-    private void transformNode(ASTNode node) {
-        if (node instanceof Stylesheet) {
-            transformStylesheet((Stylesheet) node);
-        } else if (node instanceof Stylerule) {
-            transformStylerule((Stylerule) node);
-        } else if (node instanceof VariableAssignment) {
-            transformVariableAssignment((VariableAssignment) node);
-        } else if (node instanceof Declaration) {
-            transformDeclaration((Declaration) node);
-        } else if (node instanceof IfClause) {
-            transformIfClause((IfClause) node);
-        } else {
-            System.out.println("Transform not implemented for node of type: " + node.getNodeLabel());
-        }
-    }
-
-    private void transformStylesheet(Stylesheet node) {
         variableValues.pushScope();
-
-        for (ASTNode child : node.body) {
-            transformNode(child);
-        }
-
+        recursiveChildTransform(ast.root);
         variableValues.popScope();
     }
 
-    private void transformStylerule(Stylerule node) {
-        variableValues.pushScope();
-
-        for (ASTNode child : node.body) {
-            transformNode(child);
-        }
-
-        variableValues.popScope();
-    }
-
-    private void transformIfClause(IfClause node) {
-        node.conditionalExpression = getLiteralFromExpression(node.conditionalExpression);
-        boolean result = ((BoolLiteral) node.conditionalExpression).value;
-
-        if (result) {
-            // Remove the else clause if the expression evaluates to true
-            if (node.elseClause != null) {
-                node.elseClause.body = new ArrayList<>();
+    public void recursiveChildTransform(ASTNode parentNode) {
+        for (ASTNode child : parentNode.getChildren()) {
+            if (child instanceof Stylerule) {
+                variableValues.pushScope();
+                recursiveChildTransform(child);
+                variableValues.popScope();
             }
+
+            if (child instanceof VariableAssignment) {
+                transformVariableAssignment((VariableAssignment) child);
+            }
+
+            if (child instanceof Declaration) {
+                transformDeclaration((Declaration) child);
+            }
+
+            if (child instanceof IfClause) {
+                transformIfClause((IfClause) child);
+            }
+        }
+    }
+
+    public void transformVariableAssignment(VariableAssignment assignment) {
+        assignment.expression = evaluateExpression(assignment.expression);
+        variableValues.putVariable(assignment.name.name, (Literal) assignment.expression);
+    }
+
+    public void transformDeclaration(Declaration declaration) {
+        declaration.expression = evaluateExpression(declaration.expression);
+    }
+
+    public void transformIfClause(IfClause clause) {
+        BoolLiteral result = (BoolLiteral) evaluateExpression(clause.conditionalExpression);
+        System.out.println(result);
+
+        if (result.value) {
+            // Swap the body of the if statement with the parent node after it was parsed
+            clause.elseClause = null;
         } else {
-            if (node.elseClause != null) {
-                // Swap the if and else clause bodies if an else clause exists
-                node.body = node.elseClause.body;
-                node.elseClause.body = new ArrayList<>();
+            if (clause.elseClause != null) {
+                clause.body = clause.elseClause.body;
+                clause.elseClause = null;
             } else {
-                System.out.println("bad monkey");
-                // Remove the if clause body if the expression evaluates to false
-                // and there is no else clause
-                node.body = new ArrayList<>();
+                clause.body = new ArrayList<>();
             }
         }
 
-        variableValues.pushScope();
-        for(ASTNode child : node.body) {
-            transformNode(child);
-        }
-        variableValues.popScope();
+        recursiveChildTransform(clause);
     }
 
-    private void transformVariableAssignment(VariableAssignment node) {
-        node.expression = getLiteralFromExpression(node.expression);
-        variableValues.putVariable(node.name.name, (Literal) node.expression);
+    public Literal evaluateExpression(Expression expression) {
+        if (expression instanceof Operation) {
+            return evaluateOperation((Operation) expression);
+        }
+
+        if (expression instanceof VariableReference) {
+            return variableValues.getVariable(((VariableReference) expression).name);
+        }
+
+        return (Literal) expression;
     }
 
-    private void transformDeclaration(Declaration node) {
-        node.expression = getLiteralFromExpression(node.expression);
-    }
+    public Literal evaluateOperation(Operation operation) {
+        Literal left = evaluateExpression(operation.lhs);
+        Literal right = evaluateExpression(operation.rhs);
 
-    private Literal getLiteralFromExpression(Expression node) {
-        if (node instanceof Operation) {
-            return getLiteralFromOperation((Operation) node);
-        }
+        int leftValue = (int) left.getValue();
+        int rightValue = (int) right.getValue();
 
-        if (node instanceof VariableReference) {
-            return variableValues.getVariable(((VariableReference) node).name);
-        }
-
-        return (Literal) node;
-    }
-
-    private Literal getLiteralFromOperation(Operation node) {
-        Literal left;
-        Literal right;
-
-        if (node.lhs instanceof Operation) {
-            return getLiteralFromOperation((Operation) node.lhs);
-        } else if (node.lhs instanceof VariableReference) {
-            left = variableValues.getVariable(((VariableReference) node.lhs).name);
-        } else {
-            left = (Literal) node.lhs;
-        }
-
-        if (node.rhs instanceof Operation) {
-            return getLiteralFromOperation((Operation) node.rhs);
-        } else if (node.rhs instanceof VariableReference) {
-            right = variableValues.getVariable(((VariableReference) node.rhs).name);
-        } else {
-            right = (Literal) node.rhs;
-        }
-
-        int leftValue = getLiteralValue(left);
-        int rightValue = getLiteralValue(right);
-
-        if (node instanceof AddOperation) {
-            return cloneLiteralWithValue(left, leftValue + rightValue);
-        } else if (node instanceof SubtractOperation) {
-            return cloneLiteralWithValue(left, leftValue - rightValue);
-        } else if (node instanceof MultiplyOperation) {
+        if (operation instanceof MultiplyOperation) {
             return cloneLiteralWithValue(left, leftValue * rightValue);
-        } else {
-            node.setError("Operation not implemented?");
-            return null;
         }
-    }
 
-    private int getLiteralValue(Literal literal) {
-        if (literal instanceof PixelLiteral) {
-            return ((PixelLiteral) literal).value;
-        } else if (literal instanceof ScalarLiteral) {
-            return ((ScalarLiteral) literal).value;
-        } else {
-            return ((PercentageLiteral) literal).value;
+        if (operation instanceof AddOperation) {
+            return cloneLiteralWithValue(left, leftValue + rightValue);
         }
+
+        if (operation instanceof SubtractOperation) {
+            return cloneLiteralWithValue(left, leftValue - rightValue);
+        }
+
+        throw new RuntimeException("Evaluation type not found");
     }
 
     private Literal cloneLiteralWithValue(Literal literal, int value) {
         if (literal instanceof PixelLiteral) {
             return new PixelLiteral(value);
-        } else if (literal instanceof ScalarLiteral) {
+        }
+
+        if (literal instanceof ScalarLiteral) {
             return new ScalarLiteral(value);
-        } else {
+        }
+
+        if (literal instanceof PercentageLiteral) {
             return new PercentageLiteral(value);
         }
-    }
 
+        throw new RuntimeException("Literal to clone not found");
+    }
 }

@@ -77,8 +77,8 @@ public class Checker {
         }
 
         if (node instanceof MultiplyOperation) {
-            if (leftType != ExpressionType.SCALAR || rightType != ExpressionType.SCALAR) {
-                node.setError("Multiply is only allowed with one scalar literal");
+            if (leftType != ExpressionType.SCALAR && rightType != ExpressionType.SCALAR) {
+                node.setError("Multiply is only allowed with at least one scalar literal");
                 return;
             }
         }
@@ -142,7 +142,7 @@ public class Checker {
 
     private void checkVariableAssignment(VariableAssignment node) {
         checkNode(node.expression);
-        String newVariableName = node.name.name; // // Variable reference name (very nice naming scheme I know)
+        String newVariableName = node.name.name; // Variable reference name (very nice naming scheme I know)
 
         ExpressionType newExpressionType = getExpressionType(node.expression);
         ExpressionType previousExpressionType = variableTypes.getVariable(newVariableName);
@@ -164,12 +164,15 @@ public class Checker {
 
     public ExpressionType getExpressionType(Expression expression) {
         // If the expression contains an operation, unpack that bitch
-        // and return the eventual left type. Left type should be the same as
-        // the right type, or we'll error in the checkOperation checker.
 
         // FOOL PROOF I SAY :D
         if (expression instanceof Operation) {
-            return getExpressionType(((Operation) expression).lhs);
+            ExpressionType leftType = getExpressionType(((Operation) expression).lhs);
+            if(leftType != ExpressionType.SCALAR) {
+                return leftType;
+            } else {
+                return getExpressionType(((Operation) expression).rhs);
+            }
         }
 
         // If the expression contains a variable reference

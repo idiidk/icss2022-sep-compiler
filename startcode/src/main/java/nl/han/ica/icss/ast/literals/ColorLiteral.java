@@ -28,4 +28,9 @@ public class ColorLiteral extends Literal {
 
         return Objects.hash(value);
     }
+
+    @Override
+    public Object getValue() {
+        return this.value;
+    }
 }

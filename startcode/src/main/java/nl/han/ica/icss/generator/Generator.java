@@ -47,11 +47,7 @@ public class Generator {
 			} else if (astNode instanceof IfClause){
 				IfClause ifClause = (IfClause) astNode;
 
-				for (ASTNode child: ifClause.body){
-					if (child instanceof Declaration){
-						result.append(generateDeclaration((Declaration) child));
-					}
-				}
+				result.append(generateRuleBody(ifClause.body));
 			}
 		}
 
