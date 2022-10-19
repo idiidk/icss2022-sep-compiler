@@ -9,7 +9,6 @@ import nl.han.ica.icss.ast.literals.ScalarLiteral;
 import nl.han.ica.icss.ast.operations.AddOperation;
 import nl.han.ica.icss.ast.operations.MultiplyOperation;
 import nl.han.ica.icss.ast.operations.SubtractOperation;
-import org.checkerframework.checker.units.qual.A;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,23 +25,19 @@ public class Evaluator implements Transform {
         variableValues.popScope();
     }
 
-    public void transformNode(ASTNode node, ASTNode parentNode) {
-        if (node instanceof Stylerule) {
-            variableValues.pushScope();
-            transformStylerule((Stylerule) node);
-            variableValues.popScope();
-        } else if (node instanceof VariableAssignment) {
-            transformVariableAssignment((VariableAssignment) node);
-        } else if (node instanceof Declaration) {
-            transformDeclaration((Declaration) node);
-        } else if (node instanceof IfClause) {
-            transformIfClause((IfClause) node, parentNode);
-        }
-    }
-    
     public void recursiveChildTransform(ASTNode parentNode) {
         for (ASTNode child : parentNode.getChildren()) {
-            transformNode(child, parentNode);
+            if (child instanceof Stylerule) {
+                variableValues.pushScope();
+                transformStylerule((Stylerule) child);
+                variableValues.popScope();
+            } else if (child instanceof VariableAssignment) {
+                transformVariableAssignment((VariableAssignment) child);
+            } else if (child instanceof Declaration) {
+                transformDeclaration((Declaration) child);
+            } else if (child instanceof IfClause) {
+                transformIfClause((IfClause) child, parentNode);
+            }
         }
     }
 
@@ -53,12 +48,12 @@ public class Evaluator implements Transform {
         Stylerule transformedStylerule = new Stylerule();
         HashMap<String, Declaration> seenDeclarations = new HashMap<>();
         for (ASTNode child : stylerule.body) {
-            if(child instanceof Declaration) {
+            if (child instanceof Declaration) {
                 Declaration original = (Declaration) child;
                 Declaration seenDeclaration = seenDeclarations.get(original.property.name);
 
-                if(seenDeclaration != null) {
-                    seenDeclarations.remove(seenDeclaration);
+                if (seenDeclaration != null) {
+                    seenDeclarations.remove(seenDeclaration.property.name);
                     transformedStylerule.removeChild(seenDeclaration);
                 }
 
