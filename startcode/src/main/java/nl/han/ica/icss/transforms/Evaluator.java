@@ -14,43 +14,28 @@ import java.util.ArrayList;
 
 public class Evaluator implements Transform {
     private SymbolTable<String, Literal> variableValues;
-    private ArrayList<ASTNode> toAdd;
-    ArrayList<ASTNode> newTree;
 
     @Override
     public void apply(AST ast) {
-        toAdd = new ArrayList<>();
-        newTree = new ArrayList<>();
         variableValues = new SymbolTable<>();
 
         variableValues.pushScope();
         recursiveChildTransform(ast.root);
         variableValues.popScope();
-
-        ast.root.body = newTree;
     }
 
     public void recursiveChildTransform(ASTNode parentNode) {
         for (ASTNode child : parentNode.getChildren()) {
-            toAdd.add(child);
-
             if (child instanceof Stylerule) {
-                toAdd = new ArrayList<>();
-
                 variableValues.pushScope();
                 recursiveChildTransform(child);
                 variableValues.popScope();
-
-                Stylerule newStylerule = new Stylerule();
-                newStylerule.body = toAdd;
-                newTree.add(newStylerule);
             } else if (child instanceof VariableAssignment) {
                 transformVariableAssignment((VariableAssignment) child);
             } else if (child instanceof Declaration) {
                 transformDeclaration((Declaration) child);
             } else if (child instanceof IfClause) {
-                transformIfClause((IfClause) child);
-                toAdd.remove(child);
+                transformIfClause((IfClause) child, parentNode);
             }
         }
     }
@@ -64,9 +49,8 @@ public class Evaluator implements Transform {
         declaration.expression = evaluateExpression(declaration.expression);
     }
 
-    public void transformIfClause(IfClause clause) {
+    public void transformIfClause(IfClause clause, ASTNode parent) {
         BoolLiteral result = (BoolLiteral) evaluateExpression(clause.conditionalExpression);
-        System.out.println(result);
 
         if (result.value) {
             // Swap the body of the if statement with the parent node after it was parsed
@@ -74,13 +58,17 @@ public class Evaluator implements Transform {
         } else {
             if (clause.elseClause != null) {
                 clause.body = clause.elseClause.body;
-                clause.elseClause = null;
             } else {
                 clause.body = new ArrayList<>();
             }
         }
 
-        recursiveChildTransform(clause);
+        for (ASTNode bodyNode : clause.body) {
+            parent.addChild(bodyNode);
+        }
+        parent.removeChild(clause);
+
+        recursiveChildTransform(parent);
     }
 
     public Literal evaluateExpression(Expression expression) {

@@ -39,6 +39,13 @@ public class Stylerule extends ASTNode {
 
 		return this;
     }
+
+	@Override
+	public ASTNode removeChild(ASTNode child) {
+		body.remove(child);
+		return this;
+	}
+
 	@Override
 	public boolean equals(Object o) {
 		if (this == o) return true;
