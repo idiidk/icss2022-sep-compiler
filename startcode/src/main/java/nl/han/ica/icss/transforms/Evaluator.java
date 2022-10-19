@@ -9,8 +9,10 @@ import nl.han.ica.icss.ast.literals.ScalarLiteral;
 import nl.han.ica.icss.ast.operations.AddOperation;
 import nl.han.ica.icss.ast.operations.MultiplyOperation;
 import nl.han.ica.icss.ast.operations.SubtractOperation;
+import org.checkerframework.checker.units.qual.A;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 
 public class Evaluator implements Transform {
     private SymbolTable<String, Literal> variableValues;
@@ -24,20 +26,51 @@ public class Evaluator implements Transform {
         variableValues.popScope();
     }
 
+    public void transformNode(ASTNode node, ASTNode parentNode) {
+        if (node instanceof Stylerule) {
+            variableValues.pushScope();
+            transformStylerule((Stylerule) node);
+            variableValues.popScope();
+        } else if (node instanceof VariableAssignment) {
+            transformVariableAssignment((VariableAssignment) node);
+        } else if (node instanceof Declaration) {
+            transformDeclaration((Declaration) node);
+        } else if (node instanceof IfClause) {
+            transformIfClause((IfClause) node, parentNode);
+        }
+    }
+    
     public void recursiveChildTransform(ASTNode parentNode) {
         for (ASTNode child : parentNode.getChildren()) {
-            if (child instanceof Stylerule) {
-                variableValues.pushScope();
-                recursiveChildTransform(child);
-                variableValues.popScope();
-            } else if (child instanceof VariableAssignment) {
-                transformVariableAssignment((VariableAssignment) child);
-            } else if (child instanceof Declaration) {
-                transformDeclaration((Declaration) child);
-            } else if (child instanceof IfClause) {
-                transformIfClause((IfClause) child, parentNode);
-            }
+            transformNode(child, parentNode);
         }
+    }
+
+    // Remove duplicate declarations
+    public void transformStylerule(Stylerule stylerule) {
+        recursiveChildTransform(stylerule);
+
+        Stylerule transformedStylerule = new Stylerule();
+        HashMap<String, Declaration> seenDeclarations = new HashMap<>();
+        for (ASTNode child : stylerule.body) {
+            if(child instanceof Declaration) {
+                Declaration original = (Declaration) child;
+                Declaration seenDeclaration = seenDeclarations.get(original.property.name);
+
+                if(seenDeclaration != null) {
+                    seenDeclarations.remove(seenDeclaration);
+                    transformedStylerule.removeChild(seenDeclaration);
+                }
+
+                seenDeclarations.put(original.property.name, original);
+                transformedStylerule.addChild(original);
+                continue;
+            }
+
+            transformedStylerule.addChild(child);
+        }
+
+        stylerule.body = transformedStylerule.body;
     }
 
     public void transformVariableAssignment(VariableAssignment assignment) {
@@ -63,12 +96,13 @@ public class Evaluator implements Transform {
             }
         }
 
-        for (ASTNode bodyNode : clause.body) {
-            parent.addChild(bodyNode);
-        }
-        parent.removeChild(clause);
+        recursiveChildTransform(clause);
 
-        recursiveChildTransform(parent);
+        for (ASTNode child : clause.body) {
+            parent.addChild(child);
+        }
+
+        parent.removeChild(clause);
     }
 
     public Literal evaluateExpression(Expression expression) {
