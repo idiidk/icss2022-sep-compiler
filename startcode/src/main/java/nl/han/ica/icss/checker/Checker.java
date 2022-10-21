@@ -98,6 +98,11 @@ public class Checker {
 
         // Check the conditional expression of the if statement
         checkNode(node.conditionalExpression);
+        ExpressionType ifExpressionType = getExpressionType(node.conditionalExpression);
+
+        if(ifExpressionType != ExpressionType.BOOL) {
+            node.setError("If statements can only use boolean expressions");
+        }
 
         variableTypes.pushScope();
         for (ASTNode child : node.body) {

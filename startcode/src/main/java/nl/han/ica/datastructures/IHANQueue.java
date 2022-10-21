@@ -1,7 +1,6 @@
 package nl.han.ica.datastructures;
 
 public interface IHANQueue<T> {
-
     /**
      * Clears list. Size equals 0 afterwards
      */
