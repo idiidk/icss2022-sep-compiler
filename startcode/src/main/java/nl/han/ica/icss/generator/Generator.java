@@ -6,63 +6,61 @@ import nl.han.ica.icss.ast.literals.ColorLiteral;
 import nl.han.ica.icss.ast.literals.PercentageLiteral;
 import nl.han.ica.icss.ast.literals.PixelLiteral;
 
-import java.util.ArrayList;
 import java.util.stream.Collectors;
 
 public class Generator {
-	public String generate(AST ast) {
-		return generateStyleSheet(ast.root);
-	}
+    public String generate(AST ast) {
+        return recursiveChildGenerate(ast.root);
+    }
 
-	private String generateStyleSheet(Stylesheet stylesheet){
-		StringBuilder result = new StringBuilder();
+    private String recursiveChildGenerate(ASTNode parentNode) {
+        StringBuilder total = new StringBuilder();
 
-		for (ASTNode astNode: stylesheet.getChildren()){
-			if (astNode instanceof Stylerule){
-				result.append(generateStyleRule((Stylerule) astNode));
-			}
-		}
+        for (ASTNode child : parentNode.getChildren()) {
+            if (child instanceof Stylerule) {
+                total.append(generateStylerule((Stylerule) child));
+            } else if (child instanceof Declaration) {
+                total.append(generateDeclaration((Declaration) child));
+            } else if (child instanceof IfClause) {
+                total.append(recursiveChildGenerate(child));
+            }
+        }
 
-		return result.toString();
-	}
+        return total.toString();
+    }
 
-	private String generateDeclaration(Declaration declaration) {
-		return "  " + declaration.property.name + ": " + toStringExpression(declaration.expression) + ";\n";
-	}
+    private String generateDeclaration(Declaration declaration) {
+        StringBuilder result = new StringBuilder();
 
-	private String generateSelector(Stylerule stylerule){
-		return stylerule.selectors.stream().map(ASTNode::toString).collect(Collectors.joining(" "));
-	}
+        result.append("  ");
+        result.append(declaration.property.name);
+        result.append(": ");
+        result.append(toStringExpression(declaration.expression));
+        result.append(";\n");
 
-	private String generateStyleRule(Stylerule stylerule){
-		return generateSelector(stylerule) + " {\n" + generateRuleBody(stylerule.body) + "}\n\n";
-	}
+        return result.toString();
+    }
 
-	private String generateRuleBody(ArrayList<ASTNode> body){
-		StringBuilder result = new StringBuilder();
+    private String generateStylerule(Stylerule stylerule) {
+        StringBuilder result = new StringBuilder();
 
-		for (ASTNode astNode: body){
-			if (astNode instanceof Declaration){
-				result.append(generateDeclaration((Declaration) astNode));
-			} else if (astNode instanceof IfClause){
-				IfClause ifClause = (IfClause) astNode;
+        result.append(stylerule.selectors.stream().map(ASTNode::toString).collect(Collectors.joining(", ")));
+        result.append(" {\n");
+        result.append(recursiveChildGenerate(stylerule));
+        result.append("}\n\n");
 
-				result.append(generateRuleBody(ifClause.body));
-			}
-		}
+        return result.toString();
+    }
 
-		return result.toString();
-	}
-
-	private String toStringExpression(Expression expression){
-		if (expression instanceof PercentageLiteral){
-			return ((PercentageLiteral) expression).value + "%";
-		} else if (expression instanceof PixelLiteral){
-			return ((PixelLiteral) expression).value + "px";
-		} else if (expression instanceof ColorLiteral){
-			return ((ColorLiteral) expression).value;
-		} else {
-			return "";
-		}
-	}
+    private String toStringExpression(Expression expression) {
+        if (expression instanceof PercentageLiteral) {
+            return ((PercentageLiteral) expression).value + "%";
+        } else if (expression instanceof PixelLiteral) {
+            return ((PixelLiteral) expression).value + "px";
+        } else if (expression instanceof ColorLiteral) {
+            return ((ColorLiteral) expression).value;
+        } else {
+            return "";
+        }
+    }
 }
